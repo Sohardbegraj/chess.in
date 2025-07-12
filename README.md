@@ -1,0 +1,216 @@
+# 🧠 Bitboard-Based Chess in Rust
+
+This project implements a basic chessboard in **Rust** using **bitboards**, enums, and structs. It displays the starting state of a chess game with all pieces properly arranged and outputs the board to the console.
+
+---
+
+## 📁 File Structure
+
+```
+src/
+├── main.rs
+```
+
+---
+
+## 🧱 Core Concepts
+
+### ✅ Bitboard (`u64`)
+
+A **bitboard** is a 64-bit unsigned integer where each bit represents a square on the chessboard.
+
+* Bit `0` → square `a1`
+* Bit `1` → square `b1`
+* ...
+* Bit `63` → square `h8`
+
+This is used to efficiently store and process piece positions.
+
+---
+
+## 🧩 Types and Structs
+
+### `PiecePosition`
+
+```rust
+type PiecePosition = u64;
+```
+
+Just a type alias to represent bitboards for clarity.
+
+---
+
+### `enum Color`
+
+```rust
+enum Color {
+    White,
+    Black
+}
+```
+
+Represents the color of a piece.
+
+---
+
+### `enum PieceType`
+
+```rust
+enum PieceType {
+    Pawn, Rook, Knight, Bishop, Queen, King
+}
+```
+
+Represents the type of each chess piece.
+
+---
+
+### `struct Piece`
+
+```rust
+struct Piece {
+    position: PiecePosition,
+    color: Color,
+    piece_type: PieceType
+}
+```
+
+Represents a single chess piece with:
+
+* A position (using a bitboard)
+* A color (white or black)
+* A piece type (pawn, rook, etc.)
+
+---
+
+### `enum Square`
+
+```rust
+enum Square {
+    Empty,
+    Occupied(usize),
+}
+```
+
+Each square on the board is either:
+
+* `Empty`, or
+* `Occupied(index)` → referring to the index of the piece in the `pieces` vector.
+
+---
+
+### `struct Game`
+
+```rust
+struct Game {
+    pieces: Vec<Piece>,
+    squares: Vec<Square>,
+}
+```
+
+Holds the complete state of the board:
+
+* All pieces (`Vec<Piece>`)
+* All 64 squares (`Vec<Square>`)
+
+---
+
+## ♟ Board Initialization
+
+The `initialize()` function sets up the board like a real chess game:
+
+```rust
+fn initialize() -> Game
+```
+
+It:
+
+* Adds white pieces to the bottom 2 rows (`a1` to `h2`)
+* Adds 32 empty squares (`a3` to `h6`)
+* Adds black pieces to the top 2 rows (`a7` to `h8`)
+
+Uses `push_piece_and_square` and `push_empty_square` to populate the board.
+
+---
+
+## 📤 Displaying the Board
+
+The `to_string()` method of `Game` generates a **human-readable board**:
+
+```rust
+fn to_string(&self) -> String
+```
+
+* Iterates over each square
+* If the square is empty → shows its name like `a3`
+* If occupied → shows the piece (e.g., `P ` or `r `)
+* After every 8 squares, it creates a row
+* Rows are inserted **from bottom up** (to match chessboard view from white's perspective)
+
+---
+
+### Example Output
+![result](result.png)
+
+---
+
+## 🛠 Other Important Functions
+
+### `index_to_position(index: usize) -> String`
+
+Converts a square index (0–63) into chess notation:
+
+* `0` → `a1`
+* `7` → `h1`
+* `8` → `a2`
+* ...
+* `63` → `h8`
+
+---
+
+### `bit_scan(bit: u64) -> usize`
+
+Efficiently finds the index of the 1-bit in a given bitboard using a modulo lookup trick.
+
+---
+
+### `Piece::to_string()`
+
+Returns a short string like:
+
+* `"P "` for white pawn
+* `"k "` for black king
+* All white pieces are **uppercase**
+* All black pieces are **lowercase**
+
+---
+
+## 🚀 How to Run
+
+1. Clone this repo:
+
+```bash
+git clone https://github.com/Sohardbegraj/chess.in.git
+cd rust-bitboard-chess
+```
+
+2. Run the project:
+
+```bash
+cargo run
+```
+
+You’ll see the board printed in the terminal.
+
+---
+
+## 🧠 Next Steps / Ideas
+
+* Add move generation
+* Handle turns (white/black)
+* Legal move validation
+* GUI or TUI visualization
+* Piece capturing and check/checkmate logic
+
+---
+
