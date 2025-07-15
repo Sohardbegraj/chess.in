@@ -9,6 +9,8 @@ This project implements a basic chessboard in **Rust** using **bitboards**, enum
 ```
 src/
 ├── main.rs
+├── game.rs
+├── utils.rs
 ```
 
 ---
@@ -183,6 +185,26 @@ Returns a short string like:
 * All white pieces are **uppercase**
 * All black pieces are **lowercase**
 
+
+---
+### ♟️ FEN (Forsyth–Edwards Notation) Support
+
+This project includes support for FEN (Forsyth–Edwards Notation), allowing the board state to be serialized and deserialized in a standard format used by most chess engines and GUIs.
+
+## ✅ Features:
+Parse FEN strings to initialize the game board.
+
+Generate FEN strings from the current game state.
+
+Track and update metadata such as castling rights, en passant targets, halfmove clocks, and fullmove numbers.
+```bash
+<1> Piece placement
+<2> Active color
+<3> Castling availability
+<4> En passant target square
+<5> Halfmove clock
+<6> Fullmove number
+```
 ---
 
 ## 🚀 How to Run
