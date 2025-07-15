@@ -1,6 +1,6 @@
 mod utils;
 mod game;
-
+mod rayattack;
 use game::*;
 
 fn main() {
