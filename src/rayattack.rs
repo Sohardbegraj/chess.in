@@ -1,14 +1,16 @@
+use crate::utils::*;
+
 type Bitboard = u64;
 
 pub struct Rays {
-    n_rays: Vec<Bitboard>,
-    e_rays: Vec<Bitboard>,
-    nw_rays: Vec<Bitboard>,
-    ne_rays: Vec<Bitboard>,
-    w_rays: Vec<Bitboard>,
-    s_rays: Vec<Bitboard>,
-    sw_rays: Vec<Bitboard>,
-    se_rays: Vec<Bitboard>,
+    pub n_rays: Vec<Bitboard>,
+    pub e_rays: Vec<Bitboard>,
+    pub nw_rays: Vec<Bitboard>,
+    pub ne_rays: Vec<Bitboard>,
+    pub w_rays: Vec<Bitboard>,
+    pub s_rays: Vec<Bitboard>,
+    pub sw_rays: Vec<Bitboard>,
+    pub se_rays: Vec<Bitboard>,
 }
 
 macro_rules! make_rays {
@@ -25,7 +27,7 @@ macro_rules! make_rays {
 }
 
 impl Rays {
-    fn initialize() -> Self {
+    pub fn new() -> Self {
         let n_rays = make_rays!(n_ray);
         let e_rays = make_rays!(e_ray);
         let nw_rays = make_rays!(nw_ray);
@@ -70,6 +72,11 @@ define_ray!(s_ray, |row, col, offset| (row - offset, col));
 define_ray!(sw_ray, |row, col, offset| (row - offset, col - offset));
 define_ray!(se_ray, |row, col, offset| (row - offset, col + offset));
 
+// ........
+// ........
+// ........
+// .X111111
+// ........
 
 fn set_bit(bitboard: Bitboard, row_col: (i64, i64)) -> Bitboard {
     let row = row_col.0;
@@ -80,122 +87,241 @@ fn set_bit(bitboard: Bitboard, row_col: (i64, i64)) -> Bitboard {
     bitboard | (1 << ((col - 1) + (row - 1) * 8))
 }
 
-fn bitboard_to_string(bitboard: Bitboard, mark: Option<usize>) -> String {
-    let mut row = "".to_owned();
-    let mut board = "".to_owned();
-
-    for i in 0..64 {
-        let value = (bitboard >> i) & 1;
-
-        let s = if value == 0 {
-            ".".to_owned()
+fn first_hit(ray: Bitboard, forward_ray: bool, occupancy: Bitboard) -> Option<usize> {
+    let intersection = ray & occupancy;
+    if intersection == 0 {
+        return None;
+    } else {
+        if forward_ray {
+            return Some(bit_scan(intersection));
         } else {
-            value.to_string()
-        };
-
-        match mark {
-            Some(idx) => {
-                if i == idx {
-                    row.push_str("X");
-                } else {
-                    row.push_str(&s);
-                }
-            }
-            None => row.push_str(&s),
-        }
-
-        if (i + 1) % 8 == 0 {
-            row.push_str("\n");
-            board.insert_str(0, &row);
-            row.clear();
+            return Some(bit_scan_backwards(intersection));
         }
     }
-    board
+}
+
+pub fn blocked_ray_attack(
+    ray: Bitboard,
+    ray_family: &Vec<Bitboard>,
+    forward_ray: bool,
+    own_occupancy: Bitboard,
+    enemy_occupancy: Bitboard,
+) -> Bitboard {
+    let enemy_overlap = ray & enemy_occupancy;
+    let own_overlap = ray & own_occupancy;
+    let first_own_hit = first_hit(ray, forward_ray, own_overlap);
+    let first_enemy_hit = first_hit(ray, forward_ray, enemy_overlap);
+
+    match (first_own_hit, first_enemy_hit) {
+        (None, None) => ray,
+        (None, Some(idx)) => {
+            let ray_after = ray_family[idx];
+            return ray ^ ray_after;
+        }
+        (Some(idx), None) => {
+            let ray_after = ray_family[idx];
+            return ray ^ (ray_after | 1 << idx);
+        }
+        (Some(own_idx), Some(en_idx)) => {
+            let own_after = ray_family[own_idx];
+            let en_after = ray_family[en_idx];
+            return ray ^ ((own_after | 1 << own_idx) | en_after);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn get_occupancy_1() -> (Bitboard, Bitboard) {
+        let mut own_occupancy = 0;
+        for i in 0..16 {
+            if i == 5 {
+                continue;
+            }
+            own_occupancy |= 1 << i;
+        }
+        own_occupancy |= 1 << 22;
+
+        let mut enemy_occupancy = 0;
+        for i in 48..64 {
+            if i == 57 || i == 49 {
+                continue;
+            }
+            enemy_occupancy |= 1 << i;
+        }
+        enemy_occupancy |= 1 << 41;
+        enemy_occupancy |= 1 << 42;
+        (own_occupancy, enemy_occupancy)
+    }
+
+    fn get_occupancy_2() -> (Bitboard, Bitboard) {
+        let mut own_occupancy = 0;
+        for i in 32..48 {
+            if i % 3 == 0 || i == 41 {
+                continue;
+            }
+            own_occupancy |= 1 << i;
+        }
+
+        let mut enemy_occupancy = 0;
+        for i in 48..64 {
+            if i == 57 || i == 49 {
+                continue;
+            }
+            enemy_occupancy |= 1 << i;
+        }
+        enemy_occupancy |= 1 << 41;
+        enemy_occupancy |= 1 << 42;
+        assert!(own_occupancy & enemy_occupancy == 0);
+
+        (own_occupancy, enemy_occupancy)
+    }
+
+    fn get_occupancy_3() -> (Bitboard, Bitboard) {
+        let mut own_occupancy = 0;
+        for i in 16..32 {
+            if i % 3 == 0 || i == 25 {
+                continue;
+            }
+            own_occupancy |= 1 << i;
+        }
+
+        let mut enemy_occupancy = 0;
+        for i in 32..48 {
+            if i == 41 || i == 33 {
+                continue;
+            }
+            enemy_occupancy |= 1 << i;
+        }
+        enemy_occupancy |= 1 << 25;
+        enemy_occupancy |= 1 << 26;
+        enemy_occupancy &= !own_occupancy;
+        assert!(own_occupancy & enemy_occupancy == 0);
+
+        (own_occupancy, enemy_occupancy)
+    }
+
     #[test]
-    fn print_n_ray() {
-        let rays = Rays::initialize();
-        let row = 5;
-        let col = 4;
+    fn test_ray() {
+        let rays = Rays::new();
+        let row = 6;
+        let col = 7;
         let idx = (row - 1) * 8 + col - 1;
-        println!(
-            "Here's the bitboard:\n--------------------\n{}\n--------------------",
-            bitboard_to_string(rays.n_rays[idx], Some(idx))
-        );
+
+        let mut expected_sw_6_7: Bitboard = 0;
+        for i in 1..=8 {
+            if col > i && row > i {
+                expected_sw_6_7 |= 1 << ((col - i - 1) + (row - i - 1) * 8);
+            }
+        }
+        assert_eq!(rays.sw_rays[idx], expected_sw_6_7);
+
+        let mut expected_w_6_7: Bitboard = 0;
+        for i in 1..=8 {
+            if col > i {
+                expected_w_6_7 |= 1 << ((col - i - 1) + (row - 1) * 8);
+            }
+        }
+        assert_eq!(rays.w_rays[idx], expected_w_6_7);
+
+        let mut expected_ne_6_7: Bitboard = 0;
+        for i in 1..=8 {
+            if col + i <= 8 && row + i <= 8 {
+                expected_ne_6_7 |= 1 << ((col + i - 1) + (row + i - 1) * 8);
+            }
+        }
+        assert_eq!(rays.ne_rays[idx], expected_ne_6_7);
     }
 
     #[test]
-    fn print_se_ray() {
-        let rays = Rays::initialize();
-        let idx = 44;
-        println!(
-            "Here's the bitboard:\n--------------------\n{}\n--------------------",
-            bitboard_to_string(rays.se_rays[idx], Some(idx))
+    fn test_blocked_ray() {
+        let (own_occupancy, enemy_occupancy) = get_occupancy_1();
+        let rays = Rays::new();
+        let row = 5;
+        let col = 5;
+        let idx = (row - 1) * 8 + col - 1;
+
+        let blocked_attack = blocked_ray_attack(
+            rays.nw_rays[idx],
+            &rays.nw_rays,
+            true,
+            own_occupancy,
+            enemy_occupancy,
         );
+        assert_eq!(blocked_attack, 1 << (idx + 7) | 1 << (idx + 14));
+
+        let blocked_attack = blocked_ray_attack(
+            rays.nw_rays[idx],
+            &rays.nw_rays,
+            true,
+            enemy_occupancy,
+            own_occupancy,
+        );
+        assert_eq!(blocked_attack, 1 << (idx + 7));
     }
 
     #[test]
-    fn print_sw_ray() {
-        let rays = Rays::initialize();
-        let idx = 44;
-        println!(
-            "Here's the bitboard:\n--------------------\n{}\n--------------------",
-            bitboard_to_string(rays.sw_rays[idx], Some(idx))
+    fn test_blocked_ray_several_layers() {
+        let (own_occupancy, enemy_occupancy) = get_occupancy_2();
+        let rays = Rays::new();
+        let row = 5;
+        let col = 5;
+        let idx = (row - 1) * 8 + col - 1;
+
+        let blocked_attack = blocked_ray_attack(
+            rays.nw_rays[idx],
+            &rays.nw_rays,
+            true,
+            own_occupancy,
+            enemy_occupancy,
         );
+        assert_eq!(blocked_attack, 0);
+
+        let blocked_attack = blocked_ray_attack(
+            rays.nw_rays[idx],
+            &rays.nw_rays,
+            true,
+            enemy_occupancy,
+            own_occupancy,
+        );
+        assert_eq!(blocked_attack, 1 << (idx + 7));
     }
 
     #[test]
-    fn print_nw_ray() {
-        let rays = Rays::initialize();
-        let idx = 44;
-        println!(
-            "Here's the bitboard:\n--------------------\n{}\n--------------------",
-            bitboard_to_string(rays.nw_rays[idx], Some(idx))
-        );
-    }
+    fn test_blocked_backward_ray_several_layers() {
+        let (own_occupancy, enemy_occupancy) = get_occupancy_3();
 
-    #[test]
-    fn print_ne_ray() {
-        let rays = Rays::initialize();
-        let idx = 44;
-        println!(
-            "Here's the bitboard:\n--------------------\n{}\n--------------------",
-            bitboard_to_string(rays.ne_rays[idx], Some(idx))
-        );
-    }
+        let rays = Rays::new();
+        let row = 7;
+        let col = 2;
+        let idx = (row - 1) * 8 + col - 1;
 
-    #[test]
-    fn print_e_ray() {
-        let rays = Rays::initialize();
-        let idx = 44;
-        println!(
-            "Here's the bitboard:\n--------------------\n{}\n--------------------",
-            bitboard_to_string(rays.e_rays[idx], Some(idx))
+        let blocked_attack = blocked_ray_attack(
+            rays.s_rays[idx],
+            &rays.s_rays,
+            false,
+            own_occupancy,
+            enemy_occupancy,
         );
-    }
-
-    #[test]
-    fn print_w_ray() {
-        let rays = Rays::initialize();
-        let idx = 44;
-        println!(
-            "Here's the bitboard:\n--------------------\n{}\n--------------------",
-            bitboard_to_string(rays.w_rays[idx], Some(idx))
+        assert_eq!(
+            blocked_attack,
+            1 << ((2 - 1) + (4 - 1) * 8)
+                | 1 << ((2 - 1) + (5 - 1) * 8)
+                | 1 << ((2 - 1) + (6 - 1) * 8)
         );
-    }
 
-    #[test]
-    fn print_s_ray() {
-        let rays = Rays::initialize();
-        let idx = 44;
-        println!(
-            "Here's the bitboard:\n--------------------\n{}\n--------------------",
-            bitboard_to_string(rays.s_rays[idx], Some(idx))
+        let blocked_attack = blocked_ray_attack(
+            rays.s_rays[idx],
+            &rays.s_rays,
+            true,
+            enemy_occupancy,
+            own_occupancy,
+        );
+        assert_eq!(
+            blocked_attack,
+            1 << ((2 - 1) + (5 - 1) * 8) | 1 << ((2 - 1) + (6 - 1) * 8)
         );
     }
 }
